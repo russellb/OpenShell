@@ -736,7 +736,7 @@ fn run_libkrun_vm(config: &VmLaunchConfig) -> Result<(), String> {
     //     on its own service ports (DNS:53, DHCP, HTTP API:80).
     //
     // That network plane is also what the sandbox supervisor's
-    // per-sandbox netns (veth pair + iptables, see
+    // per-sandbox netns (veth pair + nftables, see
     // `openshell-sandbox/src/sandbox/linux/netns.rs`) branches off of;
     // libkrun's built-in TSI socket impersonation would not satisfy
     // those kernel-level primitives.
