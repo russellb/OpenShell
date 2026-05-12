@@ -1384,4 +1384,17 @@ mod tests {
         assert!(!cmdline.contains("VM_NET_DNS="));
         assert!(!cmdline.contains("GPU_ENABLED="));
     }
+
+    #[test]
+    fn tap_subnet_from_host_ip_calculates_slash30_base() {
+        assert_eq!(tap_subnet_from_host_ip("10.0.128.1"), "10.0.128.0/30");
+        assert_eq!(tap_subnet_from_host_ip("10.0.128.2"), "10.0.128.0/30");
+        assert_eq!(tap_subnet_from_host_ip("10.0.128.5"), "10.0.128.4/30");
+    }
+
+    #[test]
+    fn tap_subnet_from_host_ip_handles_invalid_ip() {
+        let result = tap_subnet_from_host_ip("not-an-ip");
+        assert_eq!(result, "not-an-ip/30");
+    }
 }
