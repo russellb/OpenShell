@@ -767,11 +767,8 @@ fn run_iptables_netns(netns: &str, iptables_cmd: &str, args: &[&str]) -> Result<
     Ok(())
 }
 
-/// Well-known paths where iptables may be installed.
-/// The sandbox container PATH often excludes `/usr/sbin`, so we probe
-/// explicit paths rather than relying on `which`.
-const IPTABLES_SEARCH_PATHS: &[&str] =
-    &["/usr/sbin/iptables", "/sbin/iptables", "/usr/bin/iptables"];
+/// Well-known paths where nft may be installed.
+const NFT_SEARCH_PATHS: &[&str] = &["/usr/sbin/nft", "/sbin/nft", "/usr/bin/nft"];
 
 fn find_trusted_binary<'a>(name: &str, paths: &'a [&str]) -> Result<&'a str> {
     paths
@@ -789,100 +786,12 @@ fn find_trusted_binary<'a>(name: &str, paths: &'a [&str]) -> Result<&'a str> {
         })
 }
 
-/// Returns true if xt extension modules (e.g. `xt_comment`) cannot be used
-/// via the given iptables binary.
-///
-/// Some kernels have `nf_tables` but lack the `nft_compat` bridge that allows
-/// xt extension modules to be used through the `nf_tables` path (e.g. Jetson
-/// Linux 5.15-tegra). This probe detects that condition by attempting to
-/// insert a rule using the `xt_comment` extension. If it fails, xt extensions
-/// are unavailable and the caller should fall back to iptables-legacy.
-fn xt_extensions_unavailable(iptables_path: &str) -> bool {
-    // Create a temporary probe chain. If this fails (e.g. no CAP_NET_ADMIN),
-    // we can't determine availability — assume extensions are available.
-    let created = Command::new(iptables_path)
-        .args(["-t", "filter", "-N", "_xt_probe"])
-        .output()
-        .is_ok_and(|o| o.status.success());
-
-    if !created {
-        return false;
-    }
-
-    // Attempt to insert a rule using xt_comment. Failure means nft_compat
-    // cannot bridge xt extension modules on this kernel.
-    let probe_ok = Command::new(iptables_path)
-        .args([
-            "-t",
-            "filter",
-            "-A",
-            "_xt_probe",
-            "-m",
-            "comment",
-            "--comment",
-            "probe",
-            "-j",
-            "ACCEPT",
-        ])
-        .output()
-        .is_ok_and(|o| o.status.success());
-
-    // Clean up — best-effort, ignore failures.
-    let _ = Command::new(iptables_path)
-        .args([
-            "-t",
-            "filter",
-            "-D",
-            "_xt_probe",
-            "-m",
-            "comment",
-            "--comment",
-            "probe",
-            "-j",
-            "ACCEPT",
-        ])
-        .output();
-    let _ = Command::new(iptables_path)
-        .args(["-t", "filter", "-X", "_xt_probe"])
-        .output();
-
-    !probe_ok
-}
-
-/// Find the iptables binary path, checking well-known locations.
-///
-/// If xt extension modules are unavailable via the standard binary and
-/// `iptables-legacy` is available alongside it, the legacy binary is returned
-/// instead. This ensures bypass-detection rules can be installed on kernels
-/// where `nft_compat` is unavailable (e.g. Jetson Linux 5.15-tegra).
-fn find_iptables() -> Option<String> {
-    let standard_path = IPTABLES_SEARCH_PATHS
+/// Find the nft binary path, checking well-known locations.
+fn find_nft() -> Option<String> {
+    NFT_SEARCH_PATHS
         .iter()
         .find(|path| Path::new(path).exists())
-        .copied()?;
-
-    if xt_extensions_unavailable(standard_path) {
-        let legacy_path = standard_path.replace("iptables", "iptables-legacy");
-        if Path::new(&legacy_path).exists() {
-            debug!(
-                legacy = legacy_path,
-                "xt extensions unavailable; using iptables-legacy"
-            );
-            return Some(legacy_path);
-        }
-    }
-
-    Some(standard_path.to_string())
-}
-
-/// Find the ip6tables binary path, deriving it from the iptables location.
-fn find_ip6tables(iptables_path: &str) -> Option<String> {
-    let ip6_path = iptables_path.replace("iptables", "ip6tables");
-    if Path::new(&ip6_path).exists() {
-        Some(ip6_path)
-    } else {
-        None
-    }
+        .map(|path| (*path).to_string())
 }
 
 #[cfg(test)]
@@ -912,6 +821,13 @@ mod tests {
             find_trusted_binary("nsenter", &["relative-nsenter", "/missing/nsenter"]).unwrap_err();
 
         assert!(err.to_string().contains("trusted nsenter helper not found"));
+    }
+
+    #[test]
+    fn nft_search_paths_are_absolute() {
+        for path in NFT_SEARCH_PATHS {
+            assert!(path.starts_with('/'), "NFT_SEARCH_PATHS entry must be absolute: {path}");
+        }
     }
 
     #[test]
