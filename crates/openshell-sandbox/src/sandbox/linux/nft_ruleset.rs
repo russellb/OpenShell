@@ -162,7 +162,9 @@ mod tests {
         );
 
         // Count: should have 2 icmp rejects (TCP + UDP) and 2 icmpv6 rejects (TCP + UDP)
-        let icmp_count = ruleset.matches("reject with icmp type port-unreachable").count();
+        let icmp_count = ruleset
+            .matches("reject with icmp type port-unreachable")
+            .count();
         let icmpv6_count = ruleset
             .matches("reject with icmpv6 type port-unreachable")
             .count();

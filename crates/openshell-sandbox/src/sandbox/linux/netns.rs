@@ -278,11 +278,8 @@ impl NetworkNamespace {
         let host_ip_str = self.host_ip.to_string();
         let log_prefix = format!("openshell:bypass:{}:", &self.name);
 
-        let ruleset = super::nft_ruleset::generate_bypass_ruleset(
-            &host_ip_str,
-            proxy_port,
-            &log_prefix,
-        );
+        let ruleset =
+            super::nft_ruleset::generate_bypass_ruleset(&host_ip_str, proxy_port, &log_prefix);
 
         if let Err(e) = run_nft_netns(&self.name, &nft_path, &ruleset) {
             openshell_ocsf::ocsf_emit!(
@@ -450,7 +447,8 @@ fn run_nft_netns(netns: &str, nft_cmd: &str, ruleset: &str) -> Result<()> {
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
         return Err(miette::miette!(
-            "nft ruleset load failed in netns {netns}: {}", stderr.trim()
+            "nft ruleset load failed in netns {netns}: {}",
+            stderr.trim()
         ));
     }
 
@@ -516,7 +514,10 @@ mod tests {
     #[test]
     fn nft_search_paths_are_absolute() {
         for path in NFT_SEARCH_PATHS {
-            assert!(path.starts_with('/'), "NFT_SEARCH_PATHS entry must be absolute: {path}");
+            assert!(
+                path.starts_with('/'),
+                "NFT_SEARCH_PATHS entry must be absolute: {path}"
+            );
         }
     }
 
