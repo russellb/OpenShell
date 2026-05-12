@@ -602,11 +602,13 @@ fn run_nft_stdin(ruleset: &str) -> Result<(), String> {
         .map_err(|e| format!("failed to run nft: {e}"))?;
 
     if let Some(mut stdin) = child.stdin.take() {
-        stdin.write_all(ruleset.as_bytes())
+        stdin
+            .write_all(ruleset.as_bytes())
             .map_err(|e| format!("failed to write nft ruleset: {e}"))?;
     }
 
-    let output = child.wait_with_output()
+    let output = child
+        .wait_with_output()
         .map_err(|e| format!("failed to wait for nft: {e}"))?;
 
     if output.status.success() {

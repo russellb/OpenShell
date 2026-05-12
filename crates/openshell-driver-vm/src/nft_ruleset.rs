@@ -19,17 +19,37 @@ pub fn generate_tap_ruleset(tap_device: &str, subnet: &str, gateway_port: u16) -
 
     writeln!(ruleset, "table ip {table_name} {{").unwrap();
     writeln!(ruleset, "    chain postrouting {{").unwrap();
-    writeln!(ruleset, "        type nat hook postrouting priority 100; policy accept;").unwrap();
+    writeln!(
+        ruleset,
+        "        type nat hook postrouting priority 100; policy accept;"
+    )
+    .unwrap();
     writeln!(ruleset, "        ip saddr {subnet} masquerade").unwrap();
     writeln!(ruleset, "    }}").unwrap();
     writeln!(ruleset, "    chain forward {{").unwrap();
-    writeln!(ruleset, "        type filter hook forward priority 0; policy accept;").unwrap();
+    writeln!(
+        ruleset,
+        "        type filter hook forward priority 0; policy accept;"
+    )
+    .unwrap();
     writeln!(ruleset, "        iifname \"{tap_device}\" accept").unwrap();
-    writeln!(ruleset, "        oifname \"{tap_device}\" ct state related,established accept").unwrap();
+    writeln!(
+        ruleset,
+        "        oifname \"{tap_device}\" ct state related,established accept"
+    )
+    .unwrap();
     writeln!(ruleset, "    }}").unwrap();
     writeln!(ruleset, "    chain input {{").unwrap();
-    writeln!(ruleset, "        type filter hook input priority 0; policy accept;").unwrap();
-    writeln!(ruleset, "        iifname \"{tap_device}\" tcp dport {gateway_port} accept").unwrap();
+    writeln!(
+        ruleset,
+        "        type filter hook input priority 0; policy accept;"
+    )
+    .unwrap();
+    writeln!(
+        ruleset,
+        "        iifname \"{tap_device}\" tcp dport {gateway_port} accept"
+    )
+    .unwrap();
     writeln!(ruleset, "    }}").unwrap();
     writeln!(ruleset, "}}").unwrap();
 
