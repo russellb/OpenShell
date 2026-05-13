@@ -894,7 +894,7 @@ impl VmDriver {
                     warn!(
                         image_ref = %image_ref,
                         %message,
-                        "vm driver: local Docker image platform mismatch, falling back to registry"
+                        "vm driver: local container image platform mismatch, falling back to registry"
                     );
                     return Ok(None);
                 }
@@ -905,19 +905,19 @@ impl VmDriver {
                         .filter(|id| !id.trim().is_empty())
                         .ok_or_else(|| {
                             Status::failed_precondition(format!(
-                                "local Docker image '{image_ref}' inspect response has no image ID"
+                                "local container image '{image_ref}' inspect response has no image ID"
                             ))
                         })?;
                 info!(
                     image_ref = %image_ref,
                     image_identity = %image_identity,
-                    "vm driver: resolved image from local Docker daemon"
+                    "vm driver: resolved image from local container engine"
                 );
                 Ok(Some((docker, image_identity)))
             }
             Err(err) if is_docker_not_found_error(&err) && required_local_image => {
                 Err(Status::failed_precondition(format!(
-                    "locally built sandbox image '{image_ref}' is not present in the local Docker daemon"
+                    "locally built sandbox image '{image_ref}' is not present in the local container engine"
                 )))
             }
             Err(err) if is_docker_not_found_error(&err) => Ok(None),
@@ -928,7 +928,7 @@ impl VmDriver {
                 warn!(
                     image_ref = %image_ref,
                     error = %err,
-                    "vm driver: local Docker image inspection failed, falling back to registry"
+                    "vm driver: local container image inspection failed, falling back to registry"
                 );
                 Ok(None)
             }
