@@ -110,6 +110,15 @@ fn is_benign_tls_handshake_failure(error: &std::io::Error) -> bool {
     )
 }
 
+fn is_benign_connection_close(error: &(dyn std::error::Error + 'static)) -> bool {
+    let msg = error.to_string();
+    msg.contains("connection closed")
+        || msg.contains("connection reset")
+        || msg.contains("connection error")
+        || msg.contains("error reading a body from connection")
+        || msg.contains("broken pipe")
+}
+
 impl ServerState {
     /// Create new server state.
     #[must_use]
@@ -399,7 +408,11 @@ fn spawn_gateway_connection(
             match acceptor.inner().accept(stream).await {
                 Ok(tls_stream) => {
                     if let Err(e) = service.serve(tls_stream).await {
-                        error!(error = %e, client = %addr, "Connection error");
+                        if is_benign_connection_close(e.as_ref()) {
+                            debug!(error = %e, client = %addr, "Connection closed");
+                        } else {
+                            error!(error = %e, client = %addr, "Connection error");
+                        }
                     }
                 }
                 Err(e) => {
@@ -414,7 +427,11 @@ fn spawn_gateway_connection(
     } else {
         tokio::spawn(async move {
             if let Err(e) = service.serve(stream).await {
-                error!(error = %e, client = %addr, "Connection error");
+                if is_benign_connection_close(e.as_ref()) {
+                    debug!(error = %e, client = %addr, "Connection closed");
+                } else {
+                    error!(error = %e, client = %addr, "Connection error");
+                }
             }
         });
     }
