@@ -865,18 +865,17 @@ impl VmDriver {
         image_ref: &str,
     ) -> Result<Option<(Docker, String)>, Status> {
         let required_local_image = is_openshell_local_build_image_ref(image_ref);
-        let docker = match Docker::connect_with_local_defaults() {
-            Ok(docker) => docker,
-            Err(err) if required_local_image => {
+        let docker = match connect_local_container_engine().await {
+            Some(docker) => docker,
+            None if required_local_image => {
                 return Err(Status::failed_precondition(format!(
-                    "failed to connect to local Docker daemon for locally built sandbox image '{image_ref}': {err}"
+                    "no container engine (Docker/Podman) available for locally built sandbox image '{image_ref}'"
                 )));
             }
-            Err(err) => {
+            None => {
                 warn!(
                     image_ref = %image_ref,
-                    error = %err,
-                    "vm driver: local Docker daemon unavailable, falling back to registry"
+                    "vm driver: no local container engine available, falling back to registry"
                 );
                 return Ok(None);
             }
@@ -1524,6 +1523,57 @@ fn parse_registry_reference(image_ref: &str) -> Result<Reference, Status> {
             "invalid vm sandbox image reference '{image_ref}': {err}"
         ))
     })
+}
+
+/// Try to connect to a local container engine (Docker or Podman).
+///
+/// Tries Docker first (`connect_with_local_defaults`, which respects
+/// `DOCKER_HOST`). If Docker is unavailable, falls back to the Podman
+/// socket, which exposes a Docker-compatible API.
+async fn connect_local_container_engine() -> Option<Docker> {
+    if let Ok(docker) = Docker::connect_with_local_defaults() {
+        if docker.ping().await.is_ok() {
+            return Some(docker);
+        }
+    }
+
+    let podman_socket = podman_socket_path();
+    if podman_socket.exists() {
+        if let Ok(docker) = Docker::connect_with_unix(
+            podman_socket.to_str()?,
+            120,
+            bollard::API_DEFAULT_VERSION,
+        ) {
+            if docker.ping().await.is_ok() {
+                info!(
+                    socket = %podman_socket.display(),
+                    "vm driver: connected to Podman (Docker-compatible API)"
+                );
+                return Some(docker);
+            }
+        }
+    }
+
+    None
+}
+
+/// Podman user socket path for the current platform.
+fn podman_socket_path() -> PathBuf {
+    #[cfg(target_os = "macos")]
+    {
+        let home = std::env::var("HOME").unwrap_or_default();
+        PathBuf::from(home).join(".local/share/containers/podman/machine/podman.sock")
+    }
+    #[cfg(target_os = "linux")]
+    {
+        std::env::var("XDG_RUNTIME_DIR").map_or_else(
+            |_| {
+                let uid = nix::unistd::getuid();
+                PathBuf::from(format!("/run/user/{uid}/podman/podman.sock"))
+            },
+            |xdg| PathBuf::from(xdg).join("podman/podman.sock"),
+        )
+    }
 }
 
 fn is_openshell_local_build_image_ref(image_ref: &str) -> bool {
