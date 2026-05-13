@@ -417,32 +417,30 @@ fn run_ip_netns(netns: &str, args: &[&str]) -> Result<()> {
 
 /// Load an nftables ruleset inside a network namespace via `nsenter --net=`.
 ///
-/// Pipes the ruleset to `nft -f -` (read from stdin) for atomic application.
+/// Writes the ruleset to a temp file and loads it with `nft -f <path>`.
+/// A temp file is used instead of piping to stdin (`nft -f -`) because
+/// `nft` resolves `-` to `/dev/stdin`, which may not exist in minimal
+/// VM guest environments (e.g. virtiofs rootfs without /proc mounted
+/// at nft invocation time).
 fn run_nft_netns(netns: &str, nft_cmd: &str, ruleset: &str) -> Result<()> {
-    use std::io::Write;
+    let ruleset_path = format!("/tmp/openshell-nft-{netns}.conf");
+    std::fs::write(&ruleset_path, ruleset).into_diagnostic()?;
 
     let nsenter_path = find_trusted_binary("nsenter", NSENTER_SEARCH_PATHS)?;
     let ns_path = format!("/var/run/netns/{netns}");
     let net_flag = format!("--net={ns_path}");
 
     debug!(
-        command = %format!("{nsenter_path} {net_flag} -- {nft_cmd} -f -"),
+        command = %format!("{nsenter_path} {net_flag} -- {nft_cmd} -f {ruleset_path}"),
         "Loading nftables ruleset in namespace"
     );
 
-    let mut child = Command::new(nsenter_path)
-        .args([net_flag.as_str(), "--", nft_cmd, "-f", "-"])
-        .stdin(std::process::Stdio::piped())
-        .stdout(std::process::Stdio::piped())
-        .stderr(std::process::Stdio::piped())
-        .spawn()
+    let output = Command::new(nsenter_path)
+        .args([net_flag.as_str(), "--", nft_cmd, "-f", &ruleset_path])
+        .output()
         .into_diagnostic()?;
 
-    if let Some(mut stdin) = child.stdin.take() {
-        stdin.write_all(ruleset.as_bytes()).into_diagnostic()?;
-    }
-
-    let output = child.wait_with_output().into_diagnostic()?;
+    let _ = std::fs::remove_file(&ruleset_path);
 
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
