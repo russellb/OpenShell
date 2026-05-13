@@ -279,7 +279,7 @@ impl NetworkNamespace {
         let log_prefix = format!("openshell:bypass:{}:", &self.name);
 
         let ruleset =
-            super::nft_ruleset::generate_bypass_ruleset(&host_ip_str, proxy_port, &log_prefix);
+            super::nft_ruleset::generate_bypass_ruleset(&host_ip_str, proxy_port);
 
         if let Err(e) = run_nft_netns(&self.name, &nft_path, &ruleset) {
             openshell_ocsf::ocsf_emit!(
@@ -294,6 +294,21 @@ impl NetworkNamespace {
                     .build()
             );
             return Err(e);
+        }
+
+        let log_rules = super::nft_ruleset::generate_bypass_log_rules(&log_prefix);
+        if let Err(e) = run_nft_netns(&self.name, &nft_path, &log_rules) {
+            openshell_ocsf::ocsf_emit!(
+                openshell_ocsf::ConfigStateChangeBuilder::new(crate::ocsf_ctx())
+                    .severity(openshell_ocsf::SeverityId::Low)
+                    .status(openshell_ocsf::StatusId::Failure)
+                    .state(openshell_ocsf::StateId::Other, "degraded")
+                    .message(format!(
+                        "Failed to install bypass log rules (non-fatal) [ns:{}]: {e}",
+                        self.name
+                    ))
+                    .build()
+            );
         }
 
         openshell_ocsf::ocsf_emit!(
