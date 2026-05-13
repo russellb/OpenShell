@@ -42,14 +42,14 @@ pub fn generate_bypass_ruleset(host_ip: &str, proxy_port: u16, log_prefix: &str)
         ct state established,related accept
 
         # Rule 4a: LOG TCP SYN bypass attempts (rate-limited)
-        tcp flags syn limit rate 5/second burst 10 packets log prefix "{log_prefix}" group 0
+        tcp flags syn limit rate 5/second burst 10 packets log prefix "{log_prefix}"
         # Rule 4b: REJECT TCP (IPv4)
         meta nfproto ipv4 meta l4proto tcp reject with icmp type port-unreachable
         # Rule 4c: REJECT TCP (IPv6)
         meta nfproto ipv6 meta l4proto tcp reject with icmpv6 type port-unreachable
 
         # Rule 5a: LOG UDP bypass attempts (rate-limited)
-        meta l4proto udp limit rate 5/second burst 10 packets log prefix "{log_prefix}" group 0
+        meta l4proto udp limit rate 5/second burst 10 packets log prefix "{log_prefix}"
         # Rule 5b: REJECT UDP (IPv4)
         meta nfproto ipv4 meta l4proto udp reject with icmp type port-unreachable
         # Rule 5c: REJECT UDP (IPv6)
