@@ -55,6 +55,11 @@ UV_CACHE_DIR = "{{config_root}}/.cache/uv"
 RUSTC_WRAPPER = "sccache"
 SCCACHE_DIR = "{{config_root}}/.cache/sccache"
 
+# z3-sys bindgen needs the z3 include path. On some distros (e.g. RHEL)
+# the header lives in /usr/include/z3/ rather than /usr/include/. The
+# extra -I is harmless on systems where the path doesn't exist.
+BINDGEN_EXTRA_CLANG_ARGS = "-I/usr/include/z3"
+
 # Shared build constants (overridable via environment).
 # DOCKER_BUILDKIT enables BuildKit for Docker; ignored by podman.
 DOCKER_BUILDKIT = "1"
