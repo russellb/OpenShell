@@ -89,13 +89,8 @@ fn append_rootfs_tree_to_archive(
         let file_type = metadata.file_type();
 
         if file_type.is_dir() {
-            let mut header = tar::Header::new_gnu();
-            header.set_metadata(&metadata);
-            header.set_uid(0);
-            header.set_gid(0);
-            header.set_cksum();
             builder
-                .append_data(&mut header, &archive_path, std::io::empty())
+                .append_dir(&archive_path, &source_path)
                 .map_err(|e| format!("append dir {}: {e}", source_path.display()))?;
             append_rootfs_tree_to_archive(builder, &source_path, &archive_path)?;
             continue;
@@ -104,13 +99,8 @@ fn append_rootfs_tree_to_archive(
         if file_type.is_file() {
             let mut file = File::open(&source_path)
                 .map_err(|e| format!("open {}: {e}", source_path.display()))?;
-            let mut header = tar::Header::new_gnu();
-            header.set_metadata(&metadata);
-            header.set_uid(0);
-            header.set_gid(0);
-            header.set_cksum();
             builder
-                .append_data(&mut header, &archive_path, &mut file)
+                .append_file(&archive_path, &mut file)
                 .map_err(|e| format!("append file {}: {e}", source_path.display()))?;
             continue;
         }
@@ -139,8 +129,6 @@ fn append_symlink_to_archive(
         .map_err(|e| format!("readlink {}: {e}", source_path.display()))?;
     let mut header = tar::Header::new_gnu();
     header.set_metadata(metadata);
-    header.set_uid(0);
-    header.set_gid(0);
     header.set_size(0);
     header.set_cksum();
     builder
