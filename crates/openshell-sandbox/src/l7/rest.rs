@@ -499,7 +499,8 @@ where
                     if let BodyLength::ContentLength(body_len) = parse_body_length(header_str)? {
                         let already_have = overflow.len() as u64;
                         if body_len > already_have {
-                            let remaining = (body_len - already_have) as usize;
+                            let remaining = usize::try_from(body_len - already_have)
+                                .map_err(|_| miette!("body length overflow"))?;
                             let mut body_buf = vec![0u8; remaining];
                             client.read_exact(&mut body_buf).await.into_diagnostic()?;
                             full_request.extend_from_slice(&body_buf);
@@ -513,7 +514,7 @@ where
                         service,
                         access_key,
                         secret_key,
-                        session_token.as_deref(),
+                        session_token,
                     );
                     upstream.write_all(&signed).await.into_diagnostic()?;
                 }

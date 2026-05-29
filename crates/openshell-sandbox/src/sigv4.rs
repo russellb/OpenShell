@@ -25,7 +25,7 @@ pub fn extract_aws_region(host: &str) -> Option<String> {
 ///
 /// Removes Authorization, X-Amz-Date, X-Amz-Security-Token, and
 /// X-Amz-Content-Sha256 headers so the request can pass through the
-/// proxy's fail-closed placeholder scan before SigV4 re-signing.
+/// proxy's fail-closed placeholder scan before `SigV4` re-signing.
 pub fn strip_aws_headers(raw: &[u8]) -> Vec<u8> {
     let header_end = raw
         .windows(4)
@@ -67,9 +67,9 @@ pub fn strip_aws_headers(raw: &[u8]) -> Vec<u8> {
     output
 }
 
-/// Apply SigV4 signing to a raw HTTP request buffer.
+/// Apply `SigV4` signing to a raw HTTP request buffer.
 ///
-/// Strips existing AWS auth headers, computes a new SigV4 signature using
+/// Strips existing AWS auth headers, computes a new `SigV4` signature using
 /// the official `aws-sigv4` crate, and returns the rewritten request bytes.
 pub fn apply_sigv4_to_request(
     raw: &[u8],
@@ -94,16 +94,14 @@ pub fn apply_sigv4_to_request(
     let header_str = String::from_utf8_lossy(&raw[..header_end]);
     let lines: Vec<&str> = header_str.split("\r\n").collect();
 
-    let (method, path) = if let Some(first_line) = lines.first() {
+    let (method, path) = lines.first().map_or(("GET", "/"), |first_line| {
         let parts: Vec<&str> = first_line.splitn(3, ' ').collect();
         if parts.len() >= 2 {
             (parts[0], parts[1])
         } else {
             ("GET", "/")
         }
-    } else {
-        ("GET", "/")
-    };
+    });
 
     // Collect only headers that should be included in the SigV4 signature.
     // The old hand-rolled code only signed host, content-type, and
@@ -128,7 +126,7 @@ pub fn apply_sigv4_to_request(
     let identity: Identity = Credentials::new(
         access_key,
         secret_key,
-        session_token.map(|s| s.to_string()),
+        session_token.map(ToString::to_string),
         None,
         "openshell",
     )

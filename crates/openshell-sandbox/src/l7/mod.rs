@@ -99,7 +99,7 @@ pub struct L7EndpointConfig {
     /// Proxy-side credential signing mode for this endpoint.
     pub credential_signing: CredentialSigning,
     /// AWS signing service name (e.g. "bedrock"). Required when
-    /// credential_signing is SigV4.
+    /// `credential_signing` is `SigV4`.
     pub signing_service: String,
 }
 
