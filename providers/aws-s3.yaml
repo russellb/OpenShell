@@ -53,3 +53,5 @@ endpoints:
     protocol: rest
     access: read-write
     enforcement: enforce
+    credential_signing: sigv4
+    signing_service: s3

@@ -3,7 +3,7 @@
 
 use aws_credential_types::Credentials;
 use aws_sigv4::http_request::{
-    sign, PayloadChecksumKind, SignableBody, SignableRequest, SigningSettings,
+    PayloadChecksumKind, SignableBody, SignableRequest, SigningSettings, sign,
 };
 use aws_sigv4::sign::v4;
 use aws_smithy_runtime_api::client::identity::Identity;
@@ -195,8 +195,7 @@ mod tests {
 
     #[test]
     fn extract_region_from_hostname() {
-        let region =
-            extract_aws_region("bedrock-runtime.us-east-2.amazonaws.com").unwrap();
+        let region = extract_aws_region("bedrock-runtime.us-east-2.amazonaws.com").unwrap();
         assert_eq!(region, "us-east-2");
     }
 
@@ -224,7 +223,9 @@ mod tests {
             None,
         );
         let result_str = String::from_utf8_lossy(&result);
-        assert!(result_str.contains("authorization: AWS4-HMAC-SHA256 Credential=AKIAIOSFODNN7EXAMPLE/"));
+        assert!(
+            result_str.contains("authorization: AWS4-HMAC-SHA256 Credential=AKIAIOSFODNN7EXAMPLE/")
+        );
         assert!(result_str.contains("x-amz-content-sha256: "));
         assert!(result_str.contains("x-amz-date: "));
         assert!(!result_str.contains("x-amz-security-token"));
