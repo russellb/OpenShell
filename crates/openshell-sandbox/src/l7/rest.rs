@@ -824,7 +824,6 @@ fn hex_value(byte: u8) -> Option<u8> {
     }
 }
 
-
 async fn collect_chunked_body<C: AsyncRead + Unpin>(
     client: &mut C,
     already_read: &[u8],

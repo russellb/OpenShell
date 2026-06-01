@@ -9,8 +9,7 @@ placeholders and signs requests on the fly.
 
 - AWS CLI authenticated (`aws sts get-caller-identity` succeeds)
 - Podman running (`podman info` succeeds)
-- OpenShell built from the `feat/1576-aws-sts-with-sigv4` branch (or later,
-  once merged)
+- OpenShell built from source with AWS STS refresh and SigV4 signing support
 
 ## 1. Create AWS test resources
 
@@ -79,9 +78,9 @@ Export them before starting:
 eval "$(aws configure export-credentials --format env)"
 ```
 
-The gateway must use the local supervisor image. Edit the gateway config
-(`~/.cache/gateway-podman/gateway.toml` or equivalent) so `supervisor_image`
-appears under `[openshell.gateway]`:
+The gateway must use the locally built supervisor image. Set the
+`supervisor_image` field under `[openshell.gateway]` in the gateway config
+(typically `.cache/gateway-podman/gateway.toml` in the repo root):
 
 ```toml
 [openshell.gateway]
@@ -92,16 +91,6 @@ Then start the gateway:
 
 ```shell
 mise run gateway
-```
-
-Alternatively, start the gateway binary directly with the correct config:
-
-```shell
-eval "$(aws configure export-credentials --format env)"
-./target/debug/openshell-gateway \
-  --config .cache/gateway-podman/gateway.toml \
-  --port 18080 --log-level info --drivers podman --disable-tls \
-  --db-url "sqlite:.cache/gateway-podman/gateway.db?mode=rwc"
 ```
 
 ## 4. Configure the provider

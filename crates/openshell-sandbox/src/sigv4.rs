@@ -23,6 +23,29 @@ pub fn extract_aws_region(host: &str) -> Option<String> {
     }
 }
 
+fn is_aws_auth_header(lower: &str) -> bool {
+    matches!(
+        lower,
+        "authorization" | "x-amz-date" | "x-amz-security-token" | "x-amz-content-sha256"
+    )
+}
+
+fn is_hop_by_hop_header(lower: &str) -> bool {
+    matches!(
+        lower,
+        "connection"
+            | "proxy-connection"
+            | "keep-alive"
+            | "transfer-encoding"
+            | "te"
+            | "trailer"
+            | "upgrade"
+            | "proxy-authorization"
+            | "proxy-authenticate"
+            | "accept-encoding"
+    )
+}
+
 /// Strip AWS auth headers from raw HTTP request bytes.
 ///
 /// Removes Authorization, X-Amz-Date, X-Amz-Security-Token, and
@@ -48,11 +71,8 @@ pub fn strip_aws_headers(raw: &[u8]) -> Vec<u8> {
         if line.is_empty() {
             break;
         }
-        let lower = line.to_ascii_lowercase();
-        if lower.starts_with("authorization:")
-            || lower.starts_with("x-amz-date:")
-            || lower.starts_with("x-amz-security-token:")
-            || lower.starts_with("x-amz-content-sha256:")
+        if let Some((k, _)) = line.split_once(':')
+            && is_aws_auth_header(&k.trim().to_ascii_lowercase())
         {
             continue;
         }
@@ -105,11 +125,9 @@ pub fn apply_sigv4_to_request(
         }
     });
 
-    // Collect only headers that should be included in the SigV4 signature.
-    // The old hand-rolled code only signed host, content-type, and
-    // content-length. Signing all headers causes failures when the proxy
-    // or transport modifies unsigned-by-convention headers (Connection,
-    // Accept-Encoding, etc.) between signing and delivery.
+    // Preserve all original headers except AWS auth headers (which we
+    // regenerate) and hop-by-hop headers (which the proxy or transport may
+    // modify between signing and delivery, breaking the signature).
     let mut existing_headers: Vec<(String, String)> = Vec::new();
     for line in lines.iter().skip(1) {
         if line.is_empty() {
@@ -117,9 +135,10 @@ pub fn apply_sigv4_to_request(
         }
         if let Some((k, v)) = line.split_once(':') {
             let lower = k.trim().to_ascii_lowercase();
-            if lower == "host" || lower == "content-type" || lower == "content-length" {
-                existing_headers.push((lower, v.trim().to_string()));
+            if is_aws_auth_header(&lower) || is_hop_by_hop_header(&lower) {
+                continue;
             }
+            existing_headers.push((lower, v.trim().to_string()));
         }
     }
 
@@ -207,8 +226,7 @@ mod tests {
 
     #[test]
     fn extract_region_from_s3_virtual_hosted_hostname() {
-        let region =
-            extract_aws_region("my-bucket.s3.us-east-1.amazonaws.com").unwrap();
+        let region = extract_aws_region("my-bucket.s3.us-east-1.amazonaws.com").unwrap();
         assert_eq!(region, "us-east-1");
     }
 
@@ -253,6 +271,28 @@ mod tests {
         let result_str = String::from_utf8_lossy(&result);
         assert!(result_str.contains("authorization: AWS4-HMAC-SHA256 Credential=ASIAEXAMPLE/"));
         assert!(result_str.contains("x-amz-security-token: FwoGZXIvYXdzEBYaDH+session+token"));
+    }
+
+    #[test]
+    fn sign_preserves_s3_headers_and_strips_hop_by_hop() {
+        let raw = b"PUT /object.txt HTTP/1.1\r\nHost: my-bucket.s3.us-east-1.amazonaws.com\r\nContent-Type: text/plain\r\nContent-Length: 5\r\nx-amz-acl: private\r\nx-amz-server-side-encryption: AES256\r\nRange: bytes=0-99\r\nConnection: keep-alive\r\nAccept-Encoding: gzip\r\nProxy-Connection: keep-alive\r\n\r\nhello";
+        let result = apply_sigv4_to_request(
+            raw,
+            "my-bucket.s3.us-east-1.amazonaws.com",
+            "us-east-1",
+            "s3",
+            "AKIATEST",
+            "secret",
+            None,
+        );
+        let result_str = String::from_utf8_lossy(&result);
+        assert!(result_str.contains("x-amz-acl: private"));
+        assert!(result_str.contains("x-amz-server-side-encryption: AES256"));
+        assert!(result_str.contains("range: bytes=0-99"));
+        assert!(!result_str.contains("connection:"));
+        assert!(!result_str.contains("accept-encoding:"));
+        assert!(!result_str.contains("proxy-connection:"));
+        assert!(result_str.contains("authorization: AWS4-HMAC-SHA256"));
     }
 
     #[test]
