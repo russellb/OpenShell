@@ -48,10 +48,18 @@ credentials:
     env_vars: [AWS_SESSION_TOKEN]
     required: true
 endpoints:
-  - host: "*.amazonaws.com"
+  - host: "**.amazonaws.com"
     port: 443
     protocol: rest
+    tls: terminate
     access: read-write
     enforcement: enforce
-    credential_signing: sigv4
-    signing_service: s3
+binaries:
+  - /sandbox/.venv/bin/python
+  - /sandbox/.venv/bin/python3
+  - /sandbox/.uv/python/**
+  - /usr/bin/python3
+  - /usr/bin/python3.*
+  - /usr/bin/curl
+  - /usr/local/bin/aws
+  - /bin/bash

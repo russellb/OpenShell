@@ -495,7 +495,6 @@ where
                     let overflow = &req.raw_header[header_end..];
                     let mut full_request = rewrite_result.rewritten.clone();
                     full_request.extend_from_slice(overflow);
-                    // Read remaining body based on content-length
                     if let BodyLength::ContentLength(body_len) = parse_body_length(header_str)? {
                         let already_have = overflow.len() as u64;
                         if body_len > already_have {
@@ -824,6 +823,7 @@ fn hex_value(byte: u8) -> Option<u8> {
         _ => None,
     }
 }
+
 
 async fn collect_chunked_body<C: AsyncRead + Unpin>(
     client: &mut C,
