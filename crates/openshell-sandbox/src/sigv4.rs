@@ -10,12 +10,14 @@ use aws_smithy_runtime_api::client::identity::Identity;
 use std::time::SystemTime;
 
 /// Extract the AWS region from a standard AWS hostname.
-/// Pattern: `<service>.<region>.amazonaws.com` → `<region>`.
+/// Finds the label immediately before `amazonaws.com`.
+/// Works for both `<service>.<region>.amazonaws.com` and
+/// `<bucket>.<service>.<region>.amazonaws.com`.
 pub fn extract_aws_region(host: &str) -> Option<String> {
     let parts: Vec<&str> = host.split('.').collect();
     if parts.len() >= 4 && parts[parts.len() - 2] == "amazonaws" && parts[parts.len() - 1] == "com"
     {
-        Some(parts[1].to_string())
+        Some(parts[parts.len() - 3].to_string())
     } else {
         None
     }
@@ -200,6 +202,13 @@ mod tests {
     #[test]
     fn extract_region_from_sts_hostname() {
         let region = extract_aws_region("sts.us-east-1.amazonaws.com").unwrap();
+        assert_eq!(region, "us-east-1");
+    }
+
+    #[test]
+    fn extract_region_from_s3_virtual_hosted_hostname() {
+        let region =
+            extract_aws_region("my-bucket.s3.us-east-1.amazonaws.com").unwrap();
         assert_eq!(region, "us-east-1");
     }
 

@@ -54,6 +54,8 @@ endpoints:
     tls: terminate
     access: read-write
     enforcement: enforce
+    credential_signing: sigv4
+    signing_service: s3
 binaries:
   - /sandbox/.venv/bin/python
   - /sandbox/.venv/bin/python3
